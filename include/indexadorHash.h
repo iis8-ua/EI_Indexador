@@ -1,3 +1,5 @@
+#include <fstream>
+
 class IndexadorHash {
 
     friend ostream& operator<<(ostream& s, const IndexadorHash& p) {
@@ -198,4 +200,7 @@ private:
 
     bool almacenarPosTerm;	
     // Si es true se almacenar? la posici?n en la que aparecen los t?rminos dentro del documento en la clase InfTermDoc
+
+    void CargarStopWords(const string& fichStopWords);
+
 };
