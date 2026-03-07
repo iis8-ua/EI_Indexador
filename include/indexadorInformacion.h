@@ -1,4 +1,7 @@
-class InformacionTermino { 
+#include <ctime>
+typedef time_t Fecha;
+
+class InformacionTermino {
     friend ostream& operator<<(ostream& s, const InformacionTermino& p);
 public:
     InformacionTermino (const InformacionTermino &);
