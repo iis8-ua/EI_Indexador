@@ -1,4 +1,18 @@
-#include <fstream>
+#ifndef INDEXADORHASH_H
+#define INDEXADORHASH_H
+
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include "indexadorInformacion.h"
+#include "tokenizador.h"
+#include "stemmer.h"
+
+using namespace std;
 
 class IndexadorHash {
 
@@ -204,3 +218,5 @@ private:
     void CargarStopWords(const string& fichStopWords);
 
 };
+
+#endif

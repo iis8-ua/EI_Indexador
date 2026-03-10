@@ -4,23 +4,23 @@ using namespace std;
 
 //Clase InformaciónTermino
 InformacionTermino::InformacionTermino (const InformacionTermino &p){
-    this.ftc=p.ftc;
-    this.l_docs=p.l_docs;
+    this->ftc=p.ftc;
+    this->l_docs=p.l_docs;
 }
 
 InformacionTermino::InformacionTermino (){
-    this.ftc=0;
+    this->ftc=0;
 }
 
 InformacionTermino:: ~InformacionTermino (){
-    this.ftc=0;
+    this->ftc=0;
     l_docs.clear();
 }
 
 InformacionTermino & InformacionTermino::operator= (const InformacionTermino &p){
     if (this != &p) {
-        ftc = p.ftc;
-        l_docs = p.l_docs;
+        this->ftc = p.ftc;
+        this->l_docs = p.l_docs;
     }
     return *this;
 }
@@ -39,19 +39,19 @@ InfTermDoc::InfTermDoc() {
 }
 
 InfTermDoc::InfTermDoc(const InfTermDoc &p) {
-    ft = p.ft;
-    posTerm = p.posTerm;
+    this->ft = p.ft;
+    this->posTerm = p.posTerm;
 }
 
 InfTermDoc::~InfTermDoc() {
-    this.ft=0;
+    this->ft=0;
     posTerm.clear();
 }
 
 InfTermDoc& InfTermDoc::operator=(const InfTermDoc &p) {
     if (this != &p) {
-        ft = p.ft;
-        posTerm = p.posTerm;
+        this->ft = p.ft;
+        this->posTerm = p.posTerm;
     }
     return *this;
 }

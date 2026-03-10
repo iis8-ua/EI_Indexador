@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/include/indexadorHash.h" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/include/indexadorInformacion.h" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/include/stemmer.h" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/include/tokenizador.h" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/lib/stemmer.cpp" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/lib/tokenizador.cpp" charset="ISO-8859-1" />
+    <file url="file://$PROJECT_DIR$/memory.cpp" charset="ISO-8859-1" />
+  </component>
+</project>
