@@ -1,43 +1,25 @@
-#include <iostream> 
+#include <iostream>
 #include <string>
-#include <list> 
+#include <list>
+#include <sys/resource.h>
 #include "indexadorHash.h"
-#include "indexadorInformacion.h"
 
 using namespace std;
 
-int
-main(void)
-{
-IndexadorHash a("./StopWordsEspanyol.txt", ". ,:", false, false, "./indicePrueba", 0, true);
-
-string preg1;
-InformacionPregunta infPreg1;
-InformacionTerminoPregunta inf1;
-
-a.IndexarPregunta("pal1 yo pal2 pal1. pal3 el  ");
-a.IndexarPregunta("pal1 yo pal3 el  pal7");
-
-if(a.DevuelvePregunta(preg1))
-	cout << "ESTA INDEXADA LA PREGUNTA: " << preg1 << endl;
-else
-	cout << "NO HAY INDEXADA NINGUNA PREGUNTA" << endl;
-
-
-if(a.DevuelvePregunta("pal1", inf1))
-	cout << "pal1 SE HA INDEXADO EN LA PREGUNTA: " << inf1 << endl;
-else
-	cout << "pal1 NO SE HA INDEXADO EN LA PREGUNTA" << endl;
-
-if(a.DevuelvePregunta("pal7", inf1))
-	cout << "pal7 SE HA INDEXADO EN LA PREGUNTA: " << inf1 << endl;
-else
-	cout << "pal7 NO SE HA INDEXADO EN LA PREGUNTA" << endl;
-
-if(a.DevuelvePregunta(infPreg1))
-	cout << "ESTA INDEXADA LA PREGUNTA: " << infPreg1 << endl;
-else
-	cout << "NO HAY INDEXADA NINGUNA PREGUNTA" << endl;
-
-
+double getcputime(void) {
+    struct timeval tim;
+    struct rusage ru;
+    getrusage(RUSAGE_SELF, &ru);
+    tim=ru.ru_utime;
+    double t=(double)tim.tv_sec + (double)tim.tv_usec / 1000000.0;
+    tim=ru.ru_stime;
+    t+=(double)tim.tv_sec + (double)tim.tv_usec / 1000000.0;
+    return t;
+}
+int main() {
+    long double aa=getcputime();
+    IndexadorHash b("./StopWordsEspanyol.txt", ". ,:", false, true,
+    "./indicePruebaEspanyol", 0, true);
+    b.Indexar("listaFicheros.txt");
+    cout << "Ha tardado " << getcputime() - aa << " segundos" << endl;
 }

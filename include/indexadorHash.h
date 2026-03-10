@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <algorithm>
+#include <vector>
 #include "indexadorInformacion.h"
 #include "tokenizador.h"
 #include "stemmer.h"
@@ -216,6 +218,8 @@ private:
     // Si es true se almacenar? la posici?n en la que aparecen los t?rminos dentro del documento en la clase InfTermDoc
 
     void CargarStopWords(const string& fichStopWords);
+
+    bool PrepararTermino(const string& word, Tokenizador& tok, int tipoStemmer, string& termino) const;
 
 };
 
