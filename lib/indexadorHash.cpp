@@ -470,6 +470,10 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
         infoD.tamBytes          = st.st_size;
         infoD.fechaModificacion = st.st_mtime;
 
+        int numPal = 0;
+        int numPalSinParada = 0;
+        int numPalDiferentes = 0;
+
         // ── OPTIMIZACIÓN: Variables locales const ────────────────────────
         // Evita leer this->almacenarPosTerm y this->tipoStemmer en cada iteración
         const bool guardarPos = almacenarPosTerm;
@@ -479,20 +483,20 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
         int pos = 0;
         for (list<string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
             if (it->empty()) continue;
-            infoD.numPal++;
+            numPal++;
 
             if (stopWords.find(*it) != stopWords.end()) {
                 pos++;
                 continue;
             }
 
-            infoD.numPalSinParada++;
+            numPalSinParada++;
 
             const string* pTermino = &(*it);
             string terminoStemmed;
 
             // OPTIMIZACIÓN: Skip stemming para palabras cortas (> 3 caracteres)
-            if (tipoStem != 0 && it->length() > 3) {
+            if (tipoStem != 0 ) {
                 terminoStemmed = *it;
                 sp.stemmer(terminoStemmed, tipoStem);
                 pTermino = &terminoStemmed;
@@ -506,7 +510,7 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
 
             if (infT.l_docs.empty() || infT.l_docs.back().first != idAsignado) {
                 infT.l_docs.push_back(make_pair(idAsignado, InfTermDoc()));
-                infoD.numPalDiferentes++;
+                numPalDiferentes++;
             }
 
             InfTermDoc& itd = infT.l_docs.back().second;
@@ -519,6 +523,10 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
 
             pos++;
         }
+
+        infoD.numPal = numPal;
+        infoD.numPalSinParada = numPalSinParada;
+        infoD.numPalDiferentes = numPalDiferentes;
 
         indiceDocs[nomFich] = infoD;
         informacionColeccionDocs.numDocs++;
