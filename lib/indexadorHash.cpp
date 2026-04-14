@@ -1,38 +1,6 @@
 #include "indexadorHash.h"
 
 using namespace std;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESUMEN DE OPTIMIZACIONES IMPLEMENTADAS
-//
-// 1. InformacionTermino::l_docs → vector<pair<int,InfTermDoc>>
-//    En lugar de unordered_map<int,InfTermDoc>. El overhead de un
-//    unordered_map vacío son ~56 bytes de buckets + nodos dinámicos.
-//    Para términos que aparecen en 1-20 documentos (la inmensa mayoría),
-//    el vector plano es más compacto y más rápido por localidad de caché.
-//
-// 2. contadorID separado de indiceDocs.size()
-//    Evita el bug de IDs incorrectos tras BorraDoc + re-indexación.
-//
-// 3. Lectura de documentos con buffer ampliado (64 KB)
-//    Reduce las llamadas al SO y mejora el throughput de E/S.
-//
-// 4. Reutilización de list<string> tokens entre líneas (tokens.clear())
-//    Evita destruir y crear el contenedor en cada iteración.
-//
-// 5. reserve() en indice al inicio
-//    Evita rehashes durante la indexación masiva.
-//
-// 6. stemmerPorter instanciado una sola vez por llamada a Indexar/Pregunta
-//    En lugar de una vez por término.
-//
-// 7. CargarStopWords: inserción directa de la línea sin tokenizar
-//    cuando minuscSinAcentos ya está activo en el tokenizador (el propio
-//    tok.Tokenizar ya normaliza). Se mantiene tok.Tokenizar para respetar
-//    la especificación de filtrado con el mismo proceso que los documentos.
-// ─────────────────────────────────────────────────────────────────────────────
-
-
 // ── Constructores y destructor ────────────────────────────────────────────────
 
 IndexadorHash::IndexadorHash(const string& fichStopWords, const string& delimitadores,
@@ -128,12 +96,13 @@ void IndexadorHash::CargarStopWords(const string& fichStopWords) {
 
     stopWords.clear();
     string linea;
+    list<string> tokens;
 
     // Tokenizamos cada línea con el mismo tokenizador que usarán los
     // documentos, para que el filtrado sea coherente (minúsc/acentos, etc.)
     while (getline(archivo, linea)) {
         if (!linea.empty()) {
-            list<string> tokens;
+
             tok.Tokenizar(linea, tokens);
             for (list<string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
                 stopWords.insert(*it);
@@ -546,9 +515,10 @@ bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar) {
         return false;
     }
 
-    bool res=true;
+    bool res = true;
     vector<string> ficheros;
     struct dirent* dirp;
+
     while ((dirp = readdir(dp)) != NULL) {
         string name = string(dirp->d_name);
         if (name != "." && name != "..") {
@@ -574,21 +544,91 @@ bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar) {
 
     sort(ficheros.begin(), ficheros.end());
 
-    // Escribir lista temporal y llamar a Indexar
-    string listaTmp = dirAIndexar + "/.lista_tmp_idx.txt";
-    ofstream ftmp(listaTmp.c_str());
-    if (!ftmp) {
-        return false;
-    }
-    for (vector<string>::iterator it = ficheros.begin(); it != ficheros.end(); ++it) {
-        ftmp << *it << "\n";
-    }
-    ftmp.close();
+    stemmerPorter sp;
+    list<string> tokens;
 
-    if (!Indexar(listaTmp)) {
-        res = false;
+    for (vector<string>::iterator it = ficheros.begin(); it != ficheros.end(); ++it) {
+        string& nomFich = *it;
+
+        struct stat st;
+        if (stat(nomFich.c_str(), &st) != 0) continue;
+
+        int idAsignado;
+        unordered_map<string, InfDoc>::iterator itExistente = indiceDocs.find(nomFich);
+        if (itExistente != indiceDocs.end()) {
+            if (st.st_mtime > itExistente->second.fechaModificacion) {
+                idAsignado = itExistente->second.idDoc;
+                BorraDoc(nomFich);
+            } else continue;
+        } else {
+            idAsignado = ++contadorID;
+        }
+
+        // Leer documento
+        ifstream fDoc(nomFich.c_str(), ios::binary | ios::ate);
+        if (!fDoc) continue;
+        streamsize size = fDoc.tellg();
+        fDoc.seekg(0, ios::beg);
+
+        if (size > 0) {
+            string contenido(size, '\0');
+            if (fDoc.read(&contenido[0], size)) {
+                fDoc.close();
+
+                // Unificar reemplazo de \n y \r
+                for (char &c : contenido) {
+                    if (c == '\n' || c == '\r') {
+                        c = ' ';
+                    }
+                }
+
+                tok.Tokenizar(contenido, tokens);
+
+                InfDoc infoD;
+                infoD.idDoc = idAsignado;
+                infoD.tamBytes = st.st_size;
+                infoD.fechaModificacion = st.st_mtime;
+
+                int pos = 0;
+                for (list<string>::iterator itTok = tokens.begin(); itTok != tokens.end(); ++itTok) {
+                    if (itTok->empty()) continue;
+                    infoD.numPal++;
+
+                    if (stopWords.find(*itTok) != stopWords.end()) {
+                        pos++;
+                        continue;
+                    }
+
+                    if (tipoStemmer != 0) sp.stemmer(*itTok, tipoStemmer);
+
+                    infoD.numPalSinParada++;
+                    InformacionTermino& infT = indice[*itTok];
+
+                    if (infT.l_docs.empty() || infT.l_docs.back().first != idAsignado) {
+                        infT.l_docs.push_back(make_pair(idAsignado, InfTermDoc()));
+                        infoD.numPalDiferentes++;
+                    }
+
+                    InfTermDoc& itd = infT.l_docs.back().second;
+                    itd.ft++;
+                    infT.ftc++;
+
+                    if (almacenarPosTerm) {
+                        itd.posTerm.push_back(pos);
+                    }
+                    pos++;
+                }
+
+                indiceDocs[nomFich] = infoD;
+                informacionColeccionDocs.numDocs++;
+                informacionColeccionDocs.numTotalPal += infoD.numPal;
+                informacionColeccionDocs.numTotalPalSinParada += infoD.numPalSinParada;
+                informacionColeccionDocs.tamBytes += infoD.tamBytes;
+            }
+        } else fDoc.close();
     }
-    remove(listaTmp.c_str());
+
+    informacionColeccionDocs.numTotalPalDiferentes = indice.size();
     return res;
 }
 
