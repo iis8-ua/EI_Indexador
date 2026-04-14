@@ -22,8 +22,8 @@ IndexadorHash::IndexadorHash(const string& fichStopWords, const string& delimita
 
     // Reserva inicial: evita rehashes durante la indexación.
     // 1<<17 = 131 072 entradas; ajustar según corpus.
-    indice.reserve(1 << 17);
-    indiceDocs.reserve(1024);
+    indice.reserve(1 << 13);
+    indiceDocs.reserve(1 << 10);
 }
 
 IndexadorHash::IndexadorHash(const string& directorioIndexacion)
@@ -375,7 +375,6 @@ bool IndexadorHash::BorraDoc(const string& nomDoc) {
     informacionColeccionDocs.tamBytes            -= itDoc->second.tamBytes;
 
     // Eliminar de todos los términos la entrada de este documento.
-    // Con vector<pair<>> usamos erase + find lineal.
     for (unordered_map<string,InformacionTermino>::iterator itTerm = indice.begin();
          itTerm != indice.end(); ) {
 
@@ -469,20 +468,27 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
                         continue;
                     }
 
-                    if (tipoStemmer != 0) sp.stemmer(*it, tipoStemmer);
+                   string termino = *it;
+                   if (tipoStemmer != 0) {
+                       sp.stemmer(termino, tipoStemmer);
+                   }
 
                     infoD.numPalSinParada++;
-                    InformacionTermino& infT = indice[*it];
 
-                    // --- TRUCO PARA EL VECTOR l_docs (Eficiencia de tiempo) ---
-                    // Comprobamos si el vector está vacío o el último ID no es el actual
-                    // Esto evita la búsqueda lineal O(N) que te subía a 2.7s
+                    auto itMap = indice.find(termino);
+                    if (itMap == indice.end()) {
+                        // El término no existe: lo insertamos (se hace UNA copia aquí)
+                        itMap = indice.insert(make_pair(termino, InformacionTermino())).first;
+                    }
+
+                    InformacionTermino& infT = itMap->second;
+
                     if (infT.l_docs.empty() || infT.l_docs.back().first != idAsignado) {
                         infT.l_docs.push_back(make_pair(idAsignado, InfTermDoc()));
                         infoD.numPalDiferentes++;
                     }
 
-                    // Acceso directo al último (O(1))
+                    // Acceso directo al último (O(1)
                     InfTermDoc& itd = infT.l_docs.back().second;
                     itd.ft++;
                     infT.ftc++;
