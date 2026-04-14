@@ -387,13 +387,13 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
             continue;
         }
 
-        //se comprueba que existe el fichero
+        // se comprueba que existe el fichero
         struct stat st;
         if (stat(nomFich.c_str(), &st) != 0) {
             continue;
         }
 
-        //reindexación, solo se hace si es mas nuevo
+        // reindexación, solo se hace si es mas nuevo
         int idAsignado = ++maxID;
         unordered_map<string, InfDoc>::iterator itExistente = indiceDocs.find(nomFich);
         if (itExistente != indiceDocs.end()) {
@@ -407,65 +407,79 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
             }
         }
 
-        //para que se genere el .tk
-        tok.Tokenizar(nomFich);
-
-        //se lee directamente del .tk (una palabra por línea, ya tokenizado)
-        string tkFich = nomFich + ".tk";
-        ifstream f(tkFich.c_str());
-        if (!f) {
+        // --- OPTIMIZACIÓN: Tokenizar en memoria línea a línea ---
+        // Abrimos el documento a indexar
+        ifstream fDoc(nomFich.c_str());
+        if (!fDoc) {
             continue;
         }
 
-        //se inicializa la info del documento
+        // se inicializa la info del documento
         InfDoc infoD;
         infoD.idDoc = idAsignado;
         infoD.tamBytes = st.st_size;
         infoD.fechaModificacion = st.st_mtime;
 
-        //se procesa cada palabra del .tk (una por línea)
-        string palabra;
+        string linea;
+        list<string> tokens; // Se declara fuera del bucle para reciclarla
         int pos = 0;
-        while (getline(f, palabra)) {
-            if (palabra.empty()) {
-                continue;
-            }
-            infoD.numPal++;
 
-            //saltamos los stopwords
-            if (stopWords.find(palabra) != stopWords.end()) {
+        // Leemos el documento real línea a línea
+        while (getline(fDoc, linea)) {
+            // Limpiamos posible retorno de carro de Windows
+            if (!linea.empty() && linea[linea.length() - 1] == '\r') {
+                linea.erase(linea.length() - 1);
+            }
+            if (linea.empty()) continue;
+
+            // Tokenizamos la línea directamente en memoria
+            tok.Tokenizar(linea, tokens);
+
+            for (list<string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
+                string palabra = *it;
+                if (palabra.empty()) continue;
+
+                infoD.numPal++;
+
+                // saltamos los stopwords
+                if (stopWords.find(palabra) != stopWords.end()) {
+                    pos++;
+                    continue;
+                }
+
+                // se aplica stemming
+                string termIndexar = palabra;
+                if (tipoStemmer != 0) {
+                    sp.stemmer(termIndexar, tipoStemmer);
+                }
+
+                // se actualiza los terminos del indice
+                infoD.numPalSinParada++;
+                InformacionTermino& infT = indice[termIndexar];
+                InfTermDoc& itd = infT.l_docs[idAsignado];
+
+                if (itd.ft == 0) {
+                    infoD.numPalDiferentes++;
+                }
+                itd.ft++;
+                infT.ftc++;
+
+                if (almacenarPosTerm) {
+                    itd.posTerm.push_back(pos);
+                }
                 pos++;
-                continue;
             }
-
-            //se aplica stemming
-            string termIndexar = palabra;
-            if (tipoStemmer != 0) {
-                sp.stemmer(termIndexar, tipoStemmer);
-            }
-
-            //se actualiza los terminos del indice
-            infoD.numPalSinParada++;
-            InformacionTermino& infT = indice[termIndexar];
-            InfTermDoc& itd = infT.l_docs[idAsignado];
-            if (itd.ft == 0) {
-                infoD.numPalDiferentes++;
-            }
-            itd.ft++;
-            infT.ftc++;
-            if (almacenarPosTerm) {
-                itd.posTerm.push_back(pos);
-            }
-            pos++;
         }
+        fDoc.close(); // Cerramos el documento
 
-        //se registra en el indice de documentos
+        // se registra en el indice de documentos
         indiceDocs[nomFich] = infoD;
         informacionColeccionDocs.numDocs++;
         informacionColeccionDocs.numTotalPal += infoD.numPal;
         informacionColeccionDocs.numTotalPalSinParada += infoD.numPalSinParada;
         informacionColeccionDocs.tamBytes += infoD.tamBytes;
     }
+
     informacionColeccionDocs.numTotalPalDiferentes = indice.size();
     return true;
 }
