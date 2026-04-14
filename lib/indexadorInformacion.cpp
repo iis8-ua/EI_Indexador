@@ -58,7 +58,7 @@ InfTermDoc& InfTermDoc::operator=(const InfTermDoc &p) {
 
 ostream& operator<<(ostream& s, const InfTermDoc& p) {
     s << "ft: " << p.ft;
-    for (list<int>::const_iterator it = p.posTerm.begin(); it != p.posTerm.end(); ++it) {
+    for (vector<int>::const_iterator it = p.posTerm.begin(); it != p.posTerm.end(); ++it) {
         s << "\t" << *it;
     }
     return s;
@@ -171,7 +171,7 @@ InformacionTerminoPregunta& InformacionTerminoPregunta::operator=(const Informac
 
 ostream& operator<<(ostream& s, const InformacionTerminoPregunta& p) {
     s << "ft: " << p.ft;
-    for (list<int>::const_iterator it = p.posTerm.begin(); it != p.posTerm.end(); ++it) {
+    for (vector<int>::const_iterator it = p.posTerm.begin(); it != p.posTerm.end(); ++it) {
         s << "\t" << *it;
     }
     return s;

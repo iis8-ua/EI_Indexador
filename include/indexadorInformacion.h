@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <list>
+#include <vector>
 #include <unordered_map>
 #include <ctime>
 
@@ -23,7 +24,7 @@ public:
     // A?adir cuantos m?todos se consideren necesarios para manejar la parte privada de la clase
 private:
     int ft;	// Frecuencia del t?rmino en el documento
-    list<int> posTerm;
+    vector<int> posTerm;
     // Solo se almacenar? esta informaci?n si el campo privado del indexador almacenarPosTerm == true
     // Lista de n?meros de palabra en los que aparece el t?rmino en el documento. Los n?meros de palabra comenzar?n desde cero (la primera palabra del documento). Se numerar?n las palabras de parada. Estar? ordenada de menor a mayor posici?n.
 };
@@ -108,7 +109,7 @@ public:
     // A?adir cuantos m?todos se consideren necesarios para manejar la parte privada de la clase
 private:
     int ft;	// Frecuencia total del t?rmino en la pregunta
-    list<int> posTerm;	
+    vector<int> posTerm;
     // Solo se almacenar? esta informaci?n si el campo privado del indexador almacenarPosTerm == true
     // Lista de n?meros de palabra en los que aparece el t?rmino en la pregunta. Los n?meros de palabra comenzar?n desde cero (la primera palabra de la pregunta). Se numerar?n las palabras de parada. Estar? ordenada de menor a mayor posici?n.
 };
