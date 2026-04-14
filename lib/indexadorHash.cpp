@@ -470,6 +470,12 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
         infoD.tamBytes          = st.st_size;
         infoD.fechaModificacion = st.st_mtime;
 
+        // ── OPTIMIZACIÓN: Variables locales const ────────────────────────
+        // Evita leer this->almacenarPosTerm y this->tipoStemmer en cada iteración
+        const bool guardarPos = almacenarPosTerm;
+        const int  tipoStem   = tipoStemmer;
+        // ------------------------------------------------------------------
+
         int pos = 0;
         for (list<string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
             if (it->empty()) continue;
@@ -484,9 +490,11 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
 
             const string* pTermino = &(*it);
             string terminoStemmed;
-            if (tipoStemmer != 0) {
+
+            // OPTIMIZACIÓN: Skip stemming para palabras cortas (> 3 caracteres)
+            if (tipoStem != 0 && it->length() > 3) {
                 terminoStemmed = *it;
-                sp.stemmer(terminoStemmed, tipoStemmer);
+                sp.stemmer(terminoStemmed, tipoStem);
                 pTermino = &terminoStemmed;
             }
 
@@ -505,7 +513,8 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
             itd.ft++;
             infT.ftc++;
 
-            if (almacenarPosTerm)
+            // Usar 'guardarPos' en lugar de 'almacenarPosTerm'
+            if (guardarPos)
                 itd.posTerm.push_back(pos);
 
             pos++;
