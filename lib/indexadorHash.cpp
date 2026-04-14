@@ -475,8 +475,11 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
             string contenido(size, '\0');
             if (fDoc.read(&contenido[0], size)) {
                 fDoc.close();
-                replace(contenido.begin(), contenido.end(), '\n', ' ');
-                replace(contenido.begin(), contenido.end(), '\r', ' ');
+                for (char &c : contenido) {
+                    if (c == '\n' || c == '\r') {
+                        c = ' ';
+                    }
+                }
 
                 // Llamada legal al Tokenizador original
                 tok.Tokenizar(contenido, tokens);
