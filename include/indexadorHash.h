@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <algorithm>
 #include <vector>
+#include <cstdio>
 #include "indexadorInformacion.h"
 #include "tokenizador.h"
 #include "stemmer.h"

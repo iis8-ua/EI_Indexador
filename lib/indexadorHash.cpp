@@ -22,7 +22,7 @@ IndexadorHash::IndexadorHash(const string& fichStopWords, const string& delimita
 
     // Reserva inicial: evita rehashes durante la indexación.
     // 1<<17 = 131 072 entradas; ajustar según corpus.
-    indice.reserve(1 << 13);
+    indice.reserve(1 << 16);
     indiceDocs.reserve(1 << 10);
 }
 
@@ -408,19 +408,25 @@ bool IndexadorHash::BorraDoc(const string& nomDoc) {
 // ── Indexar ───────────────────────────────────────────────────────────────────
 
 bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
-    ifstream lista(ficheroDocumentos.c_str());
+    FILE* lista = fopen(ficheroDocumentos.c_str(), "rb");
     if (!lista) return false;
 
     stemmerPorter sp;
-    string nomFich;
-    // Obligatorio usar list para que el Tokenizador no proteste
     list<string> tokens;
 
-    while (getline(lista, nomFich)) {
-        if (nomFich.empty()) continue;
+    const int TAM_BLOQUE = 65536;
+    char bufLectura[TAM_BLOQUE];
+    string nomFich;
+    string resto;
+    nomFich.reserve(512);
+    resto.reserve(512);
+
+    // Lambda para procesar una línea (nombre de fichero)
+    auto procesarFichero = [&](const string& nomFich) {
+        if (nomFich.empty()) return;
 
         struct stat st;
-        if (stat(nomFich.c_str(), &st) != 0) continue;
+        if (stat(nomFich.c_str(), &st) != 0) return;
 
         int idAsignado;
         unordered_map<string, InfDoc>::iterator itExistente = indiceDocs.find(nomFich);
@@ -428,92 +434,132 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
             if (st.st_mtime > itExistente->second.fechaModificacion) {
                 idAsignado = itExistente->second.idDoc;
                 BorraDoc(nomFich);
-            } else continue;
+            } else return;
         } else {
             idAsignado = ++contadorID;
         }
 
-        // Buffer de lectura para eficiencia
-        ifstream fDoc(nomFich.c_str(), ios::binary | ios::ate);
-        if (!fDoc) continue;
-        streamsize size = fDoc.tellg();
-        fDoc.seekg(0, ios::beg);
+        // ── Leer el documento con FILE* + buffer ──────────────────────────
+        FILE* fDoc = fopen(nomFich.c_str(), "rb");
+        if (!fDoc) return;
 
-        if (size > 0) {
-            string contenido(size, '\0');
-            if (fDoc.read(&contenido[0], size)) {
-                fDoc.close();
-                for (char &c : contenido) {
-                    if (c == '\n' || c == '\r') {
-                        c = ' ';
-                    }
-                }
+        size_t size = static_cast<size_t>(st.st_size);
+        if (size == 0) { fclose(fDoc); return; }
 
-                // Llamada legal al Tokenizador original
-                tok.Tokenizar(contenido, tokens);
+        string contenido;
+        contenido.resize(size);
 
-                InfDoc infoD;
-                infoD.idDoc = idAsignado;
-                infoD.tamBytes = st.st_size;
-                infoD.fechaModificacion = st.st_mtime;
+        char bufDoc[65536];
+        size_t totalLeido = 0;
+        size_t bytesLeidos;
+        while ((bytesLeidos = fread(bufDoc, 1, sizeof(bufDoc), fDoc)) > 0) {
+            // Reemplazar \n y \r por espacio en el buffer antes de copiar
+            for (size_t i = 0; i < bytesLeidos; i++)
+                if (bufDoc[i] == '\n' || bufDoc[i] == '\r') bufDoc[i] = ' ';
+            memcpy(&contenido[totalLeido], bufDoc, bytesLeidos);
+            totalLeido += bytesLeidos;
+        }
+        fclose(fDoc);
+        contenido.resize(totalLeido);
+        // ─────────────────────────────────────────────────────────────────
 
-                int pos = 0;
-                // Iterador de lista (necesario para recorrer 'tokens')
-                for (list<string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
-                    if (it->empty()) continue;
-                    infoD.numPal++;
+        tok.Tokenizar(contenido, tokens);
 
-                    if (stopWords.find(*it) != stopWords.end()) {
-                        pos++;
-                        continue;
-                    }
+        InfDoc infoD;
+        infoD.idDoc             = idAsignado;
+        infoD.tamBytes          = st.st_size;
+        infoD.fechaModificacion = st.st_mtime;
 
-                   string termino = *it;
-                   if (tipoStemmer != 0) {
-                       sp.stemmer(termino, tipoStemmer);
-                   }
+        int pos = 0;
+        for (list<string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
+            if (it->empty()) continue;
+            infoD.numPal++;
 
-                    infoD.numPalSinParada++;
-
-                    auto itMap = indice.find(termino);
-                    if (itMap == indice.end()) {
-                        // El término no existe: lo insertamos (se hace UNA copia aquí)
-                        itMap = indice.insert(make_pair(termino, InformacionTermino())).first;
-                    }
-
-                    InformacionTermino& infT = itMap->second;
-
-                    if (infT.l_docs.empty() || infT.l_docs.back().first != idAsignado) {
-                        infT.l_docs.push_back(make_pair(idAsignado, InfTermDoc()));
-                        infoD.numPalDiferentes++;
-                    }
-
-                    // Acceso directo al último (O(1)
-                    InfTermDoc& itd = infT.l_docs.back().second;
-                    itd.ft++;
-                    infT.ftc++;
-
-                    if (almacenarPosTerm) {
-                        itd.posTerm.push_back(pos);
-                    }
-                    pos++;
-                }
-
-                indiceDocs[nomFich] = infoD;
-                informacionColeccionDocs.numDocs++;
-                informacionColeccionDocs.numTotalPal += infoD.numPal;
-                informacionColeccionDocs.numTotalPalSinParada += infoD.numPalSinParada;
-                informacionColeccionDocs.tamBytes += infoD.tamBytes;
+            if (stopWords.find(*it) != stopWords.end()) {
+                pos++;
+                continue;
             }
-        } else fDoc.close();
+
+            infoD.numPalSinParada++;
+
+            const string* pTermino = &(*it);
+            string terminoStemmed;
+            if (tipoStemmer != 0) {
+                terminoStemmed = *it;
+                sp.stemmer(terminoStemmed, tipoStemmer);
+                pTermino = &terminoStemmed;
+            }
+
+            auto itMap = indice.find(*pTermino);
+            if (itMap == indice.end())
+                itMap = indice.emplace(*pTermino, InformacionTermino()).first;
+
+            InformacionTermino& infT = itMap->second;
+
+            if (infT.l_docs.empty() || infT.l_docs.back().first != idAsignado) {
+                infT.l_docs.push_back(make_pair(idAsignado, InfTermDoc()));
+                infoD.numPalDiferentes++;
+            }
+
+            InfTermDoc& itd = infT.l_docs.back().second;
+            itd.ft++;
+            infT.ftc++;
+
+            if (almacenarPosTerm)
+                itd.posTerm.push_back(pos);
+
+            pos++;
+        }
+
+        indiceDocs[nomFich] = infoD;
+        informacionColeccionDocs.numDocs++;
+        informacionColeccionDocs.numTotalPal          += infoD.numPal;
+        informacionColeccionDocs.numTotalPalSinParada += infoD.numPalSinParada;
+        informacionColeccionDocs.tamBytes             += infoD.tamBytes;
+    };
+
+    // ── Leer ficheroDocumentos línea a línea con fread + buffer ───────────
+    size_t bytesLeidos;
+    while ((bytesLeidos = fread(bufLectura, 1, TAM_BLOQUE, lista)) > 0) {
+        size_t pos = 0;
+        while (pos < bytesLeidos) {
+            size_t start = pos;
+            while (pos < bytesLeidos && bufLectura[pos] != '\n') pos++;
+
+            if (pos < bytesLeidos) {
+                // Tenemos línea completa
+                if (!resto.empty()) {
+                    resto.append(bufLectura + start, pos - start);
+                    if (!resto.empty() && resto.back() == '\r')
+                        resto.pop_back();
+                    procesarFichero(resto);
+                    resto.clear();
+                } else {
+                    size_t len = pos - start;
+                    if (len > 0 && bufLectura[pos - 1] == '\r') len--;
+                    nomFich.assign(bufLectura + start, len);
+                    procesarFichero(nomFich);
+                }
+                pos++;  // saltar el '\n'
+            } else {
+                // Línea incompleta — guardar resto para el siguiente bloque
+                resto.append(bufLectura + start, pos - start);
+            }
+        }
     }
+
+    // Última línea sin '\n' final
+    if (!resto.empty()) {
+        if (resto.back() == '\r') resto.pop_back();
+        procesarFichero(resto);
+    }
+
+    fclose(lista);
     informacionColeccionDocs.numTotalPalDiferentes = indice.size();
     return true;
 }
 
-
 // ── IndexarDirectorio ─────────────────────────────────────────────────────────
-
 bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar) {
     DIR* dp = opendir(dirAIndexar.c_str());
     if (!dp) {
@@ -532,11 +578,8 @@ bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar) {
             struct stat st;
             if (stat(ruta.c_str(), &st) == 0) {
                 if (S_ISDIR(st.st_mode)) {
-                    if (!IndexarDirectorio(ruta)) {
-                        res = false;
-                    }
-                }
-                else {
+                    if (!IndexarDirectorio(ruta)) res = false;
+                } else {
                     ficheros.push_back(ruta);
                 }
             }
@@ -544,17 +587,17 @@ bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar) {
     }
     closedir(dp);
 
-    if (ficheros.empty()) {
-        return res;
-    }
+    if (ficheros.empty()) return res;
 
     sort(ficheros.begin(), ficheros.end());
 
     stemmerPorter sp;
     list<string> tokens;
 
-    for (vector<string>::iterator it = ficheros.begin(); it != ficheros.end(); ++it) {
-        string& nomFich = *it;
+    for (vector<string>::iterator itFich = ficheros.begin();
+         itFich != ficheros.end(); ++itFich) {
+
+        const string& nomFich = *itFich;
 
         struct stat st;
         if (stat(nomFich.c_str(), &st) != 0) continue;
@@ -570,68 +613,84 @@ bool IndexadorHash::IndexarDirectorio(const string& dirAIndexar) {
             idAsignado = ++contadorID;
         }
 
-        // Leer documento
-        ifstream fDoc(nomFich.c_str(), ios::binary | ios::ate);
+        // ── Leer documento con FILE* + buffer ─────────────────────────────
+        FILE* fDoc = fopen(nomFich.c_str(), "rb");
         if (!fDoc) continue;
-        streamsize size = fDoc.tellg();
-        fDoc.seekg(0, ios::beg);
 
-        if (size > 0) {
-            string contenido(size, '\0');
-            if (fDoc.read(&contenido[0], size)) {
-                fDoc.close();
+        size_t size = static_cast<size_t>(st.st_size);
+        if (size == 0) { fclose(fDoc); continue; }
 
-                // Unificar reemplazo de \n y \r
-                for (char &c : contenido) {
-                    if (c == '\n' || c == '\r') {
-                        c = ' ';
-                    }
-                }
+        string contenido;
+        contenido.resize(size);
 
-                tok.Tokenizar(contenido, tokens);
+        char bufDoc[65536];
+        size_t totalLeido = 0;
+        size_t bytesLeidos;
+        while ((bytesLeidos = fread(bufDoc, 1, sizeof(bufDoc), fDoc)) > 0) {
+            for (size_t i = 0; i < bytesLeidos; i++)
+                if (bufDoc[i] == '\n' || bufDoc[i] == '\r') bufDoc[i] = ' ';
+            memcpy(&contenido[totalLeido], bufDoc, bytesLeidos);
+            totalLeido += bytesLeidos;
+        }
+        fclose(fDoc);
+        contenido.resize(totalLeido);
+        // ─────────────────────────────────────────────────────────────────
 
-                InfDoc infoD;
-                infoD.idDoc = idAsignado;
-                infoD.tamBytes = st.st_size;
-                infoD.fechaModificacion = st.st_mtime;
+        tok.Tokenizar(contenido, tokens);
 
-                int pos = 0;
-                for (list<string>::iterator itTok = tokens.begin(); itTok != tokens.end(); ++itTok) {
-                    if (itTok->empty()) continue;
-                    infoD.numPal++;
+        InfDoc infoD;
+        infoD.idDoc             = idAsignado;
+        infoD.tamBytes          = st.st_size;
+        infoD.fechaModificacion = st.st_mtime;
 
-                    if (stopWords.find(*itTok) != stopWords.end()) {
-                        pos++;
-                        continue;
-                    }
+        int pos = 0;
+        for (list<string>::iterator it = tokens.begin();
+             it != tokens.end(); ++it) {
 
-                    if (tipoStemmer != 0) sp.stemmer(*itTok, tipoStemmer);
+            if (it->empty()) continue;
+            infoD.numPal++;
 
-                    infoD.numPalSinParada++;
-                    InformacionTermino& infT = indice[*itTok];
-
-                    if (infT.l_docs.empty() || infT.l_docs.back().first != idAsignado) {
-                        infT.l_docs.push_back(make_pair(idAsignado, InfTermDoc()));
-                        infoD.numPalDiferentes++;
-                    }
-
-                    InfTermDoc& itd = infT.l_docs.back().second;
-                    itd.ft++;
-                    infT.ftc++;
-
-                    if (almacenarPosTerm) {
-                        itd.posTerm.push_back(pos);
-                    }
-                    pos++;
-                }
-
-                indiceDocs[nomFich] = infoD;
-                informacionColeccionDocs.numDocs++;
-                informacionColeccionDocs.numTotalPal += infoD.numPal;
-                informacionColeccionDocs.numTotalPalSinParada += infoD.numPalSinParada;
-                informacionColeccionDocs.tamBytes += infoD.tamBytes;
+            if (stopWords.find(*it) != stopWords.end()) {
+                pos++;
+                continue;
             }
-        } else fDoc.close();
+
+            infoD.numPalSinParada++;
+
+            const string* pTermino = &(*it);
+            string terminoStemmed;
+            if (tipoStemmer != 0) {
+                terminoStemmed = *it;
+                sp.stemmer(terminoStemmed, tipoStemmer);
+                pTermino = &terminoStemmed;
+            }
+
+            auto itMap = indice.find(*pTermino);
+            if (itMap == indice.end())
+                itMap = indice.emplace(*pTermino, InformacionTermino()).first;
+
+            InformacionTermino& infT = itMap->second;
+
+            if (infT.l_docs.empty() || infT.l_docs.back().first != idAsignado) {
+                infT.l_docs.push_back(make_pair(idAsignado, InfTermDoc()));
+                infoD.numPalDiferentes++;
+            }
+
+            InfTermDoc& itd = infT.l_docs.back().second;
+            itd.ft++;
+            infT.ftc++;
+
+            if (almacenarPosTerm)
+                itd.posTerm.push_back(pos);
+
+            pos++;
+        }
+
+        indiceDocs[nomFich] = infoD;
+        informacionColeccionDocs.numDocs++;
+        informacionColeccionDocs.numTotalPal          += infoD.numPal;
+        informacionColeccionDocs.numTotalPalSinParada += infoD.numPalSinParada;
+        informacionColeccionDocs.tamBytes             += infoD.tamBytes;
     }
 
     informacionColeccionDocs.numTotalPalDiferentes = indice.size();
