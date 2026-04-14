@@ -25,9 +25,37 @@ InformacionTermino & InformacionTermino::operator= (const InformacionTermino &p)
     return *this;
 }
 
+InfTermDoc& InformacionTermino::operator[](int idDoc) {
+    for (vector<pair<int,InfTermDoc>>::iterator it = l_docs.begin(); it != l_docs.end(); ++it) {
+        if (it->first == idDoc) {
+            return it->second;
+        }
+    }
+    l_docs.push_back(make_pair(idDoc, InfTermDoc()));
+    return l_docs.back().second;
+}
+
+InfTermDoc* InformacionTermino::find(int idDoc) {
+    for (vector<pair<int,InfTermDoc>>::iterator it = l_docs.begin(); it != l_docs.end(); ++it) {
+        if (it->first == idDoc) {
+            return &it->second;
+        }
+    }
+    return 0;
+}
+
+const InfTermDoc* InformacionTermino::find(int idDoc) const {
+    for (vector<pair<int,InfTermDoc>>::const_iterator it = l_docs.begin(); it != l_docs.end(); ++it) {
+        if (it->first == idDoc) {
+            return &it->second;
+        }
+    }
+    return 0;
+}
+
 ostream& operator<<(ostream& s, const InformacionTermino& p) {
     s << "Frecuencia total: " << p.ftc << "\tfd: " << p.l_docs.size();
-    for (unordered_map<int, InfTermDoc>::const_iterator it = p.l_docs.begin(); it != p.l_docs.end(); ++it) {
+    for (vector<pair<int,InfTermDoc>>::const_iterator it = p.l_docs.begin(); it != p.l_docs.end(); ++it) {
         s << "\tId.Doc: " << it->first << "\t" << it->second;
     }
     return s;

@@ -44,8 +44,12 @@ public:
     // A?adir cuantos m?todos se consideren necesarios para manejar la parte privada de la clase
 private:
     int ftc;	// Frecuencia total del t?rmino en la colecci?n
-    unordered_map<int, InfTermDoc> l_docs; 
+    vector<pair<int, InfTermDoc>> l_docs;
     // Tabla Hash que se acceder? por el id del documento, devolviendo un objeto de la clase InfTermDoc que contiene toda la informaci?n de aparici?n del t?rmino en el documento
+    InfTermDoc& operator[](int idDoc);
+    InfTermDoc* find(int idDoc);
+    const InfTermDoc* find(int idDoc) const;
+    int numDocs() const { return static_cast<int>(l_docs.size()); }
 };
 
 ostream& operator<<(ostream& s, const InformacionTermino& p);
