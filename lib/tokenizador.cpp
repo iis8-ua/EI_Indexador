@@ -55,13 +55,12 @@ void Tokenizador::Tokenizar (const string& str, list<string>& tokens) const{
         string::size_type pos = punteroStr->find_first_of(delimiters, lastPos);
 
        while (string::npos != pos || string::npos != lastPos) {
-           string palabra = punteroStr->substr(lastPos, pos - lastPos);
            if (!papelera.empty()) {
-               papelera.front() = palabra;
-               tokens.splice(tokens.end(), papelera, papelera.begin());
+                papelera.front().assign(*punteroStr, lastPos, pos - lastPos);
+                tokens.splice(tokens.end(), papelera, papelera.begin());
            }
            else {
-               tokens.push_back(palabra);
+               tokens.push_back(string(*punteroStr, lastPos, pos - lastPos));
            }
 
            lastPos = punteroStr->find_first_not_of(delimiters, pos);

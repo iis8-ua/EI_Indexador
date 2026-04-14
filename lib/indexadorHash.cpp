@@ -481,6 +481,8 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
         // ------------------------------------------------------------------
 
         int pos = 0;
+        string terminoStemmed;
+        terminoStemmed.reserve(64);
         for (list<string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
             if (it->empty()) continue;
             numPal++;
@@ -493,7 +495,6 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
             numPalSinParada++;
 
             const string* pTermino = &(*it);
-            string terminoStemmed;
 
             // OPTIMIZACIÓN: Skip stemming para palabras cortas (> 3 caracteres)
             if (tipoStem != 0 ) {
