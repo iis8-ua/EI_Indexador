@@ -8,13 +8,11 @@ InformacionTermino::InformacionTermino (const InformacionTermino &p){
     this->l_docs=p.l_docs;
 }
 
-InformacionTermino::InformacionTermino (){
-    this->ftc=0;
+InformacionTermino::InformacionTermino() : ftc(0) {
 }
 
 InformacionTermino:: ~InformacionTermino (){
     this->ftc=0;
-    l_docs.clear();
 }
 
 InformacionTermino & InformacionTermino::operator= (const InformacionTermino &p){
@@ -62,8 +60,7 @@ ostream& operator<<(ostream& s, const InformacionTermino& p) {
 }
 
 //Clase InfTermDoc
-InfTermDoc::InfTermDoc() {
-    ft = 0;
+InfTermDoc::InfTermDoc() : ft(0) {
 }
 
 InfTermDoc::InfTermDoc(const InfTermDoc &p) {
@@ -73,7 +70,6 @@ InfTermDoc::InfTermDoc(const InfTermDoc &p) {
 
 InfTermDoc::~InfTermDoc() {
     this->ft=0;
-    posTerm.clear();
 }
 
 InfTermDoc& InfTermDoc::operator=(const InfTermDoc &p) {
@@ -93,13 +89,8 @@ ostream& operator<<(ostream& s, const InfTermDoc& p) {
 }
 
 //Clase InfDoc
-InfDoc::InfDoc() {
-    idDoc = 0;
-    numPal = 0;
-    numPalSinParada = 0;
-    numPalDiferentes = 0;
-    tamBytes = 0;
-    fechaModificacion = 0;
+InfDoc::InfDoc() : idDoc(0), numPal(0), numPalSinParada(0),
+                   numPalDiferentes(0), tamBytes(0), fechaModificacion(0) {
 }
 
 InfDoc::InfDoc(const InfDoc &p) {
@@ -136,12 +127,9 @@ ostream& operator<<(ostream& s, const InfDoc& p) {
 }
 
 //Clase InfColeccionDocs
-InfColeccionDocs::InfColeccionDocs() {
-    numDocs = 0;
-    numTotalPal = 0;
-    numTotalPalSinParada = 0;
-    numTotalPalDiferentes = 0;
-    tamBytes = 0;
+InfColeccionDocs::InfColeccionDocs() : numDocs(0), numTotalPal(0),
+                                       numTotalPalSinParada(0),
+                                       numTotalPalDiferentes(0), tamBytes(0) {
 }
 
 InfColeccionDocs::InfColeccionDocs(const InfColeccionDocs &p) {
@@ -176,8 +164,7 @@ ostream& operator<<(ostream& s, const InfColeccionDocs& p) {
 }
 
 //Clase InformacionTerminoPregunta
-InformacionTerminoPregunta::InformacionTerminoPregunta() {
-    ft = 0;
+InformacionTerminoPregunta::InformacionTerminoPregunta() : ft(0) {
 }
 
 InformacionTerminoPregunta::InformacionTerminoPregunta(const InformacionTerminoPregunta &p) {
@@ -186,7 +173,6 @@ InformacionTerminoPregunta::InformacionTerminoPregunta(const InformacionTerminoP
 }
 
 InformacionTerminoPregunta::~InformacionTerminoPregunta() {
-    posTerm.clear();
 }
 
 InformacionTerminoPregunta& InformacionTerminoPregunta::operator=(const InformacionTerminoPregunta &p) {
@@ -206,10 +192,9 @@ ostream& operator<<(ostream& s, const InformacionTerminoPregunta& p) {
 }
 
 //Clase InformacionPregunta
-InformacionPregunta::InformacionPregunta() {
-    numTotalPal = 0;
-    numTotalPalSinParada = 0;
-    numTotalPalDiferentes = 0;
+InformacionPregunta::InformacionPregunta() : numTotalPal(0),
+                                             numTotalPalSinParada(0),
+                                             numTotalPalDiferentes(0) {
 }
 
 InformacionPregunta::InformacionPregunta(const InformacionPregunta &p) {

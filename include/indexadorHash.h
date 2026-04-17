@@ -176,10 +176,10 @@ private:
     IndexadorHash();	
     // Este constructor se pone en la parte privada porque no se permitir? crear un indexador sin inicializarlo convenientemente. La inicializaci?n la decidir? el alumno
 
-    unordered_map<string, InformacionTermino> indice;	 
+    unordered_map<string, InformacionTermino> indice;
     // ?ndice de t?rminos indexados accesible por el t?rmino
 
-    unordered_map<string, InfDoc> indiceDocs;	 
+    unordered_map<string, InfDoc> indiceDocs;
     // ?ndice de documentos indexados accesible por el nombre del documento
 
 
@@ -189,7 +189,7 @@ private:
     string pregunta;
     // Pregunta indexada actualmente. Si no hay ninguna indexada, contendr?a el valor ""
 
-    unordered_map<string, InformacionTerminoPregunta> indicePregunta;	 
+    unordered_map<string, InformacionTerminoPregunta> indicePregunta;
     // ?ndice de t?rminos indexados en una pregunta
 
     InformacionPregunta infPregunta;	
