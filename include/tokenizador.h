@@ -14,10 +14,14 @@
 
 using namespace std;
 
+class IndexadorHash;
+
 class Tokenizador {
 friend ostream& operator<<(ostream&, const Tokenizador&);	 
 // cout << "DELIMITADORES: " << delimiters << " TRATA CASOS ESPECIALES: " << casosEspeciales << " PASAR A MINUSCULAS Y SIN ACENTOS: " << pasarAminuscSinAcentos;
 // Aunque se modifique el almacenamiento de los delimitadores por temas de eficiencia, el campo delimiters se imprimir? con el string le?do en el tokenizador (tras las modificaciones y eliminaci?n de los caracteres repetidos correspondientes)
+
+friend class IndexadorHash;
 
 public:
     Tokenizador (const string& delimitadoresPalabra, const bool& kcasosEspeciales, const bool& minuscSinAcentos);	
@@ -89,6 +93,8 @@ private:
     void TokenizarCasosEspeciales(const string& str, list<string>& tokens) const;
 
     mutable list<string> papelera;
+
+    void TokenizarRapido(const string& str, vector<string>& tokens) const;
 };
 
 #endif

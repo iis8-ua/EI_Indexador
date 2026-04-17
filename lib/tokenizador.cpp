@@ -661,3 +661,38 @@ string Tokenizador::Normalizar(const string& str) const {
     }
     return aux;
 }
+
+void Tokenizador::TokenizarRapido(const string& str, vector<string>& tokens) const {
+    tokens.clear();
+    if (str.empty()) {
+        return;
+    }
+
+    string strNormalizado;
+    const string* punteroStr = &str;
+
+    if (pasarAminuscSinAcentos) {
+        strNormalizado = Normalizar(str);
+        punteroStr = &strNormalizado;
+    }
+
+    const char* strData = punteroStr->data();
+    size_t len = punteroStr->length();
+    size_t i = 0;
+
+    while (i < len) {
+        while (i < len && es_delim[(unsigned char)strData[i]]) {
+            i++;
+        }
+        if (i >= len) {
+            break;
+        }
+
+        size_t start = i;
+        while (i < len && !es_delim[(unsigned char)strData[i]]) {
+            i++;
+        }
+
+        tokens.emplace_back(strData + start, i - start);
+    }
+}

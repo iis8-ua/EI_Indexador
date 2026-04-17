@@ -412,8 +412,12 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
     if (!lista) return false;
 
     stemmerPorter sp;
-    list<string> tokens;
 
+    // Cacheamos configuraciones
+    const bool guardarPos = almacenarPosTerm;
+    const int  tipoStem   = tipoStemmer;
+
+    // Variables de lectura principal
     const int TAM_BLOQUE = 65536;
     char bufLectura[TAM_BLOQUE];
     string nomFich;
@@ -421,7 +425,10 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
     nomFich.reserve(512);
     resto.reserve(512);
 
-    // Lambda para procesar una línea (nombre de fichero)
+    // Vector reutilizable para tokens (evita realocaciones)
+    vector<string> tokens;
+
+    // --- LAMBDA DE PROCESAMIENTO DE DOCUMENTO ---
     auto procesarFichero = [&](const string& nomFich) {
         if (nomFich.empty()) return;
 
@@ -439,7 +446,7 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
             idAsignado = ++contadorID;
         }
 
-        // ── Leer el documento con FILE* + buffer ──────────────────────────
+        // Leer el documento ultrarrápido
         FILE* fDoc = fopen(nomFich.c_str(), "rb");
         if (!fDoc) return;
 
@@ -453,103 +460,86 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
         size_t totalLeido = 0;
         size_t bytesLeidos;
         while ((bytesLeidos = fread(bufDoc, 1, sizeof(bufDoc), fDoc)) > 0) {
-            // Reemplazar \n y \r por espacio en el buffer antes de copiar
-            for (size_t i = 0; i < bytesLeidos; i++)
-                if (bufDoc[i] == '\n' || bufDoc[i] == '\r') bufDoc[i] = ' ';
             memcpy(&contenido[totalLeido], bufDoc, bytesLeidos);
             totalLeido += bytesLeidos;
         }
         fclose(fDoc);
         contenido.resize(totalLeido);
-        // ─────────────────────────────────────────────────────────────────
 
-        tok.Tokenizar(contenido, tokens);
-
+        // Configurar infoD
         InfDoc infoD;
         infoD.idDoc             = idAsignado;
         infoD.tamBytes          = st.st_size;
         infoD.fechaModificacion = st.st_mtime;
 
-        int numPal = 0;
-        int numPalSinParada = 0;
-        int numPalDiferentes = 0;
-
-        // ── OPTIMIZACIÓN: Variables locales const ────────────────────────
-        // Evita leer this->almacenarPosTerm y this->tipoStemmer en cada iteración
-        const bool guardarPos = almacenarPosTerm;
-        const int  tipoStem   = tipoStemmer;
-        // ------------------------------------------------------------------
-
         int pos = 0;
-        string terminoStemmed;
-        terminoStemmed.reserve(64);
-        for (list<string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
-            if (it->empty()) continue;
-            numPal++;
 
-            if (stopWords.find(*it) != stopWords.end()) {
+        // TOKENIZACIÓN + NORMALIZACIÓN vía TokenizarRapido
+        tok.TokenizarRapido(contenido, tokens);
+
+        for (const string& palabra_orig : tokens) {
+            infoD.numPal++;
+
+            // Copia mutable para stemming
+            string palabra = palabra_orig;
+
+            // E. StopWords
+            if (stopWords.find(palabra) != stopWords.end()) {
                 pos++;
                 continue;
             }
 
-            numPalSinParada++;
+            infoD.numPalSinParada++;
 
-            const string* pTermino = &(*it);
-
-            // OPTIMIZACIÓN: Skip stemming para palabras cortas (> 3 caracteres)
-            if (tipoStem != 0 ) {
-                terminoStemmed = *it;
-                sp.stemmer(terminoStemmed, tipoStem);
-                pTermino = &terminoStemmed;
+            // F. Stemming
+            if (tipoStem != 0) {
+                sp.stemmer(palabra, tipoStem);
             }
 
-            auto itMap = indice.find(*pTermino);
-            if (itMap == indice.end())
-                itMap = indice.emplace(*pTermino, InformacionTermino()).first;
+            // G. Indexación pura (Truco .back)
+            auto itMap = indice.find(palabra);
+            if (itMap == indice.end()) {
+                itMap = indice.emplace(palabra, InformacionTermino()).first;
+            }
 
             InformacionTermino& infT = itMap->second;
 
             if (infT.l_docs.empty() || infT.l_docs.back().first != idAsignado) {
                 infT.l_docs.push_back(make_pair(idAsignado, InfTermDoc()));
-                numPalDiferentes++;
+                infoD.numPalDiferentes++;
             }
 
             InfTermDoc& itd = infT.l_docs.back().second;
             itd.ft++;
             infT.ftc++;
 
-            // Usar 'guardarPos' en lugar de 'almacenarPosTerm'
-            if (guardarPos)
+            if (guardarPos) {
                 itd.posTerm.push_back(pos);
-
+            }
             pos++;
         }
 
-        infoD.numPal = numPal;
-        infoD.numPalSinParada = numPalSinParada;
-        infoD.numPalDiferentes = numPalDiferentes;
-
+        // Guardar documento procesado
         indiceDocs[nomFich] = infoD;
         informacionColeccionDocs.numDocs++;
         informacionColeccionDocs.numTotalPal          += infoD.numPal;
         informacionColeccionDocs.numTotalPalSinParada += infoD.numPalSinParada;
         informacionColeccionDocs.tamBytes             += infoD.tamBytes;
     };
+    // --- FIN LAMBDA ---
 
-    // ── Leer ficheroDocumentos línea a línea con fread + buffer ───────────
-    size_t bytesLeidos;
-    while ((bytesLeidos = fread(bufLectura, 1, TAM_BLOQUE, lista)) > 0) {
+    // ── Lectura de la lista de documentos ───────────
+    size_t bytesLeidosMain;
+    while ((bytesLeidosMain = fread(bufLectura, 1, TAM_BLOQUE, lista)) > 0) {
         size_t pos = 0;
-        while (pos < bytesLeidos) {
+        while (pos < bytesLeidosMain) {
             size_t start = pos;
-            while (pos < bytesLeidos && bufLectura[pos] != '\n') pos++;
+            while (pos < bytesLeidosMain && bufLectura[pos] != '\n') pos++;
 
-            if (pos < bytesLeidos) {
-                // Tenemos línea completa
+            if (pos < bytesLeidosMain) {
                 if (!resto.empty()) {
                     resto.append(bufLectura + start, pos - start);
-                    if (!resto.empty() && resto.back() == '\r')
-                        resto.pop_back();
+                    if (!resto.empty() && resto.back() == '\r') resto.pop_back();
                     procesarFichero(resto);
                     resto.clear();
                 } else {
@@ -558,15 +548,13 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
                     nomFich.assign(bufLectura + start, len);
                     procesarFichero(nomFich);
                 }
-                pos++;  // saltar el '\n'
+                pos++;
             } else {
-                // Línea incompleta — guardar resto para el siguiente bloque
                 resto.append(bufLectura + start, pos - start);
             }
         }
     }
 
-    // Última línea sin '\n' final
     if (!resto.empty()) {
         if (resto.back() == '\r') resto.pop_back();
         procesarFichero(resto);
