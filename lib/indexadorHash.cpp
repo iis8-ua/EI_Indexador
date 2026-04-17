@@ -425,8 +425,10 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
     nomFich.reserve(512);
     resto.reserve(512);
 
-    // Vector reutilizable para tokens (evita realocaciones)
+    // Reutilizables fuera del lambda
     vector<string> tokens;
+    string palabraStem;
+    palabraStem.reserve(64);
 
     // --- LAMBDA DE PROCESAMIENTO DE DOCUMENTO ---
     auto procesarFichero = [&](const string& nomFich) {
@@ -453,16 +455,8 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
         size_t size = static_cast<size_t>(st.st_size);
         if (size == 0) { fclose(fDoc); return; }
 
-        string contenido;
-        contenido.resize(size);
-
-        char bufDoc[65536];
-        size_t totalLeido = 0;
-        size_t bytesLeidos;
-        while ((bytesLeidos = fread(bufDoc, 1, sizeof(bufDoc), fDoc)) > 0) {
-            memcpy(&contenido[totalLeido], bufDoc, bytesLeidos);
-            totalLeido += bytesLeidos;
-        }
+        string contenido(size, '\0');
+        size_t totalLeido = fread(&contenido[0], 1, size, fDoc);
         fclose(fDoc);
         contenido.resize(totalLeido);
 
@@ -480,42 +474,36 @@ bool IndexadorHash::Indexar(const string& ficheroDocumentos) {
         for (const string& palabra_orig : tokens) {
             infoD.numPal++;
 
-            // Copia mutable para stemming
-            string palabra = palabra_orig;
-
-            // E. StopWords
-            if (stopWords.find(palabra) != stopWords.end()) {
+            // StopWords sin copia
+            if (stopWords.find(palabra_orig) != stopWords.end()) {
                 pos++;
                 continue;
             }
 
             infoD.numPalSinParada++;
 
-            // F. Stemming
+            // Elegimos qué string indexar sin copia innecesaria
+            const string* pPalabra = &palabra_orig;
             if (tipoStem != 0) {
-                sp.stemmer(palabra, tipoStem);
+                palabraStem = palabra_orig; // copia solo si hay stemming
+                sp.stemmer(palabraStem, tipoStem);
+                pPalabra = &palabraStem;
             }
 
-            // G. Indexación pura (Truco .back)
-            auto itMap = indice.find(palabra);
-            if (itMap == indice.end()) {
-                itMap = indice.emplace(palabra, InformacionTermino()).first;
-            }
+            // Indexación usando puntero — sin copia extra
+            auto itMap = indice.find(*pPalabra);
+            if (itMap == indice.end())
+                itMap = indice.emplace(*pPalabra, InformacionTermino()).first;
 
             InformacionTermino& infT = itMap->second;
-
             if (infT.l_docs.empty() || infT.l_docs.back().first != idAsignado) {
                 infT.l_docs.push_back(make_pair(idAsignado, InfTermDoc()));
                 infoD.numPalDiferentes++;
             }
-
             InfTermDoc& itd = infT.l_docs.back().second;
             itd.ft++;
             infT.ftc++;
-
-            if (guardarPos) {
-                itd.posTerm.push_back(pos);
-            }
+            if (guardarPos) itd.posTerm.push_back(pos);
             pos++;
         }
 
