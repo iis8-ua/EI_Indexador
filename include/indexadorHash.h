@@ -196,6 +196,7 @@ private:
     // Informaci?n recogida de la pregunta indexada
 
     unordered_set<string> stopWords;
+    unordered_set<string> stopWordsFiltrado;
     // Palabras de parada. El filtrado de palabras de parada se realizar?, tanto en la pregunta como en los documentos, teniendo en cuenta el par?metro minuscSinAcentos y tipoStemmer. Es decir que se aplicar? el mismo proceso a las palabras de parada almacenadas en el fichero antes de realizar el filtrado (p.ej. si se aplica el pasar a min?sculas los t?rminos del documento/pregunta a indexar, para comprobar si se ha de eliminar el t?rmino, ?ste se comparar? con la versi?n de palabras de parada en min?sculas). Esto se pide as? para casos en los que en el documento/pregunta aparezca: "La casa de ?l" y est?n almacenadas como stopWords "la, el", si se activa el par?metro minuscSinAcentos, entonces deber?a filtrar "La, ?l", si no hubiese estado activo ese par?metro, entonces no se hubiesen filtrado.
 
     string ficheroStopWords;

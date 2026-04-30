@@ -82,19 +82,27 @@ IndexadorHash& IndexadorHash::operator=(const IndexadorHash& t) {
 
 void IndexadorHash::CargarStopWords(const string& fichStopWords) {
     ifstream archivo(fichStopWords.c_str());
-
     if (!archivo) {
         return;
     }
 
     stopWords.clear();
+    stopWordsFiltrado.clear();
     string linea;
     vector<string> tokens;
+    stemmerPorter sp;
+
     while (getline(archivo, linea)) {
-        if (!linea.empty()) {
-            tok.TokenizarRapido(linea, tokens);
-            for (const string& t : tokens)
-                stopWords.insert(t);
+        if (linea.empty()) continue;
+
+        tok.TokenizarRapido(linea, tokens);
+        for (const string& t : tokens) {
+            stopWords.insert(t);
+            string termino = t;
+            if (tipoStemmer != 0) {
+                sp.stemmer(termino, tipoStemmer);
+            }
+            stopWordsFiltrado.insert(termino);
         }
     }
     archivo.close();
@@ -291,6 +299,7 @@ bool IndexadorHash::IndexarPregunta(const string& preg) {
 
     list<string> tokens;
     tok.Tokenizar(preg, tokens);
+
     if (tokens.empty()) {
         return false;
     }
@@ -298,21 +307,21 @@ bool IndexadorHash::IndexarPregunta(const string& preg) {
     stemmerPorter sp;
     int pos = 0;
 
-    for (list<string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
+    for (auto it = tokens.begin(); it != tokens.end(); ++it) {
         infPregunta.numTotalPal++;
 
-        if (stopWords.find(*it) != stopWords.end()) {
+        string termino = *it;
+        if (tipoStemmer != 0) {
+            sp.stemmer(termino, tipoStemmer);
+        }
+
+        if (stopWordsFiltrado.find(termino) != stopWordsFiltrado.end()) {
             pos++;
             continue;
         }
 
-        string& termIndexar = *it;
-        if (tipoStemmer != 0) {
-            sp.stemmer(termIndexar, tipoStemmer);
-        }
-
         infPregunta.numTotalPalSinParada++;
-        InformacionTerminoPregunta& itp = indicePregunta[termIndexar];
+        InformacionTerminoPregunta& itp = indicePregunta[termino];
 
         if (itp.ft == 0) {
             infPregunta.numTotalPalDiferentes++;
